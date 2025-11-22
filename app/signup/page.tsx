@@ -1,12 +1,12 @@
 "use client";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { sanitizeString, sanitizeEmail, sanitizePhone } from "@/lib/security/input-sanitizer";
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get('returnUrl');
@@ -442,5 +442,26 @@ export default function SignupPage() {
 
       <Footer />
     </section>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={
+      <section className="max-w-md mx-auto mt-6 sm:mt-10 px-4 sm:px-0">
+        <div className="glass rounded-2xl p-4 sm:p-6 md:p-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/3 mb-4"></div>
+            <div className="space-y-4">
+              <div className="h-12 bg-slate-200 dark:bg-slate-700 rounded"></div>
+              <div className="h-12 bg-slate-200 dark:bg-slate-700 rounded"></div>
+              <div className="h-12 bg-slate-200 dark:bg-slate-700 rounded"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    }>
+      <SignupForm />
+    </Suspense>
   );
 }

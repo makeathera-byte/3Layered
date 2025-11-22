@@ -1,24 +1,11 @@
 import { NextResponse } from "next/server";
-import fs from "fs/promises";
-import path from "path";
 
-const PRODUCT_DIR = "D:\\3 Layered Resources\\products";
-
-function contentTypeForExt(ext: string): string {
-  switch (ext) {
-    case ".jpg":
-    case ".jpeg":
-      return "image/jpeg";
-    case ".png":
-      return "image/png";
-    case ".webp":
-      return "image/webp";
-    case ".svg":
-      return "image/svg+xml";
-    default:
-      return "application/octet-stream";
-  }
-}
+// Default category images from Supabase Storage
+// This route serves as a fallback when no specific category image is found
+const DEFAULT_CATEGORY_IMAGES = [
+  'https://naoazafsrpqglltizasu.supabase.co/storage/v1/object/public/Images/halo%205.jpg',
+  'https://naoazafsrpqglltizasu.supabase.co/storage/v1/object/public/Images/mandir_3.jpg',
+];
 
 export async function GET(req: Request) {
   try {
@@ -27,30 +14,17 @@ export async function GET(req: Request) {
     let index = Number.parseInt(indexParam, 10);
     if (!Number.isFinite(index) || index < 0) index = 0;
 
-    const entries = await fs.readdir(PRODUCT_DIR, { withFileTypes: true });
-    const files = entries
-      .filter((e) => e.isFile())
-      .map((e) => e.name)
-      .filter((n) => /\.(png|jpg|jpeg|webp|svg)$/i.test(n))
-      .sort();
-
-    if (files.length === 0) {
-      return NextResponse.json({ error: "No images found in products folder." }, { status: 404 });
-    }
-
-    const fileName = files[Math.min(index, files.length - 1)];
-    const filePath = path.join(PRODUCT_DIR, fileName);
-    const data = await fs.readFile(filePath);
-    const type = contentTypeForExt(path.extname(fileName).toLowerCase());
-
-    return new NextResponse(data, {
-      headers: {
-        "content-type": type,
-        "cache-control": "no-store",
-      },
-    });
-  } catch (err: any) {
-    return NextResponse.json({ error: "Unable to read images", detail: String(err?.message ?? err) }, { status: 500 });
+    // Use default images from Supabase Storage
+    const imageUrl = DEFAULT_CATEGORY_IMAGES[Math.min(index, DEFAULT_CATEGORY_IMAGES.length - 1)] || DEFAULT_CATEGORY_IMAGES[0];
+    
+    // Redirect to the image URL
+    return NextResponse.redirect(imageUrl, { status: 302 });
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json(
+      { error: "Unable to load image", detail: errorMessage },
+      { status: 500 }
+    );
   }
 }
 
