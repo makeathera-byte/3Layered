@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 240" width="900" height="240">
+  <defs>
+    <style>
+      .brand { fill: #1f3b34; }
+      .brandStroke { stroke: #eaf4ef; stroke-width: 3; paint-order: stroke fill; }
+      .tag { fill: #e6f0ea; font-family: Arial, Helvetica, sans-serif; font-size: 16px; letter-spacing: 3px; }
+      .word { fill: #1f3b34; stroke: #eaf4ef; stroke-width: 1.5; paint-order: stroke fill; font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 96px; }
+      .glow { filter: drop-shadow(0 0 8px rgba(234,244,239,0.35)); }
+    </style>
+  </defs>
+
+  <!-- Wordmark -->
+  <text class="word glow" x="80" y="110">3 LA</text>
+
+  <!-- Cube replacing the Y -->
+  <g transform="translate(370,45)">
+    <polygon class="brand glow" points="40,0 80,20 40,40 0,20" />
+    <polygon class="brand glow" points="40,40 80,20 80,70 40,90" opacity="0.85" />
+    <polygon class="brand glow" points="0,20 40,40 40,90 0,70" opacity="0.7" />
+    <polygon class="brand brandStroke" points="40,0 80,20 40,40 0,20" fill="none" />
+  </g>
+
+  <text class="word glow" x="470" y="110">ERED</text>
+
+  <!-- Tagline bar -->
+  <rect x="160" y="150" width="580" height="26" rx="2" class="brand" />
+  <text x="190" y="168" class="tag">YOU DREAM IT , WE 3D IT</text>
+</svg>

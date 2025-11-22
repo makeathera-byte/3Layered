@@ -1,0 +1,185 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Whitish green theme with moss text */
+  --bg: 236 253 245; /* near emerald-50 */
+  --fg: 50 65 40;    /* moss green for text */
+}
+
+html, body, #__next {
+  height: 100%;
+}
+
+body {
+  color: rgb(var(--fg));
+  background: radial-gradient(1200px 600px at 0% 0%, rgba(168, 255, 211, 0.24), transparent),
+              radial-gradient(900px 450px at 100% 30%, rgba(16, 185, 129, 0.12), transparent),
+              rgb(var(--bg));
+}
+
+/* Make all text moss green by default */
+body,
+body * {
+  color: rgb(var(--fg));
+}
+
+/* Preserve colors for specific UI elements */
+svg,
+svg *,
+[class*="text-white"],
+[class*="text-black"],
+[class*="text-red"],
+[class*="text-blue"],
+[class*="text-emerald-600"],
+[class*="text-emerald-400"],
+button[class*="text-white"],
+a[class*="text-white"],
+.text-white,
+.text-black,
+.text-red-500,
+.text-blue-500 {
+  color: inherit;
+}
+
+/* Text inputs should have moss green text */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+textarea {
+  color: rgb(var(--fg));
+}
+
+/* Placeholders should be lighter moss green */
+input::placeholder,
+textarea::placeholder {
+  color: rgba(var(--fg), 0.6);
+}
+
+
+/* Utility to force moss green text */
+.text-moss {
+  color: rgb(var(--fg));
+}
+
+.glass {
+  background: rgba(236, 253, 245, 0.18);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  box-shadow: 0 8px 32px rgba(16, 185, 129, 0.24);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.logo-premium {
+  border-color: rgba(16, 185, 129, 0.40);
+  box-shadow: 0 12px 40px rgba(16, 185, 129, 0.25);
+  background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(16, 185, 129, 0.10) 100%);
+}
+
+
+.grid-faint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(16,185,129,0.10) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16,185,129,0.10) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(600px 600px at 50% 50%, rgba(0,0,0,1), rgba(0,0,0,0));
+}
+
+[data-grid="off"] .grid-faint {
+  display: none;
+}
+
+/* Font Size Settings */
+html[data-font-size="small"] {
+  font-size: 87.5%;
+}
+
+html[data-font-size="small"] body,
+html[data-font-size="small"] body * {
+  font-size: inherit;
+}
+
+html[data-font-size="medium"] {
+  font-size: 100%;
+}
+
+html[data-font-size="large"] {
+  font-size: 112.5%;
+}
+
+html[data-font-size="large"] body,
+html[data-font-size="large"] body * {
+  font-size: inherit;
+}
+
+/* Reduced Motion */
+[data-reduced-motion="on"] *,
+[data-reduced-motion="on"] *::before,
+[data-reduced-motion="on"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Animations */
+[data-animations="off"] * {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Greenish white catalog background wrapper */
+.catalog-bg {
+  background: rgba(236, 253, 245, 0.95); /* deeper green tint */
+  border: 1px solid rgba(16, 185, 129, 0.26);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.20);
+}
+
+/* Green Aesthetic Button Styles */
+button,
+[type="button"],
+[type="submit"],
+[type="reset"],
+.btn {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.25) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.40);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.20);
+  transition: all 0.3s ease;
+  color: rgb(var(--fg));
+}
+
+button:hover,
+[type="button"]:hover,
+[type="submit"]:hover,
+[type="reset"]:hover,
+.btn:hover {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.35) 0%, rgba(5, 150, 105, 0.35) 100%);
+  border-color: rgba(16, 185, 129, 0.60);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.30);
+  transform: translateY(-1px);
+}
+
+button:active,
+[type="button"]:active,
+[type="submit"]:active,
+[type="reset"]:active,
+.btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+}
+
+button:focus,
+[type="button"]:focus,
+[type="submit"]:focus,
+[type="reset"]:focus,
+.btn:focus {
+  outline: 2px solid rgba(16, 185, 129, 0.50);
+  outline-offset: 2px;
+}
