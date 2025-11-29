@@ -92,8 +92,7 @@ export default function ProductsPage() {
                     loading="lazy"
                     decoding="async"
                     style={{ 
-                      imageRendering: 'auto',
-                      WebkitImageRendering: 'auto'
+                      imageRendering: 'auto'
                     }}
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
