@@ -47,6 +47,11 @@ export default function HomePage() {
   ]);
 
   const [specialOffers, setSpecialOffers] = useState<SpecialOffer[]>([]);
+  const [categoryImages, setCategoryImages] = useState<Record<string, string>>({
+    "HOME DECOR": "/api/category-image/home-decor",
+    "TABLE TOP": "/api/category-image/table-top",
+    "GOD'S SCULPTURE": "/api/category-image/gods-sculpture",
+  });
 
   const [loading, setLoading] = useState(true);
 
@@ -57,10 +62,11 @@ export default function HomePage() {
   const loadContent = async () => {
     try {
       setLoading(true);
-      const [heroRes, featuresRes, offersRes] = await Promise.all([
+      const [heroRes, featuresRes, offersRes, categoryImagesRes] = await Promise.all([
         fetch("/api/home-content/hero"),
         fetch("/api/home-content/features"),
         fetch("/api/home-content/special-offers"),
+        fetch("/api/category-images"),
       ]);
 
       if (heroRes.ok) {
@@ -77,18 +83,24 @@ export default function HomePage() {
         const data = await offersRes.json();
         if (data.offers) setSpecialOffers(data.offers);
       }
+
+      if (categoryImagesRes.ok) {
+        const data = await categoryImagesRes.json();
+        if (data.categoryImages) {
+          // Map database keys to display labels
+          const mappedImages: Record<string, string> = {
+            "HOME DECOR": data.categoryImages["home-decor"] || "/api/category-image/home-decor",
+            "TABLE TOP": data.categoryImages["table-top"] || "/api/category-image/table-top",
+            "GOD'S SCULPTURE": data.categoryImages["gods-sculpture"] || "/api/category-image/gods-sculpture",
+          };
+          setCategoryImages(mappedImages);
+        }
+      }
     } catch (error) {
       console.error("Error loading content:", error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const categoryImages = {
-    "HOME DECOR": "/api/category-image/home-decor",
-    "TABLE TOP": "https://naoazafsrpqglltizasu.supabase.co/storage/v1/object/public/Images/halo%205.jpg",
-    "ACTION FIGURE": "https://cdn.shopify.com/s/files/1/0931/6948/4063/files/il_fullxfull.4697843338_l1qb.webp?v=1757274835",
-    "GOD'S SCULPTURE": "/api/category-image/gods-sculpture",
   };
 
   return (

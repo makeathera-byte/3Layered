@@ -1,6 +1,7 @@
 ﻿"use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
 
@@ -17,11 +18,37 @@ interface Product {
 
 export default function ProductsPage() {
   const [trendingProducts, setTrendingProducts] = useState<Product[]>([]);
+  const [categoryImages, setCategoryImages] = useState<Record<string, string>>({
+    "HOME DECOR": "/api/category-image/home-decor",
+    "TABLE TOP": "/api/category-image/table-top",
+    "GOD'S SCULPTURE": "/api/category-image/gods-sculpture",
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadProducts();
+    loadCategoryImages();
   }, []);
+
+  const loadCategoryImages = async () => {
+    try {
+      const response = await fetch('/api/category-images');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.categoryImages) {
+          // Map database keys to display labels
+          const mappedImages: Record<string, string> = {
+            "HOME DECOR": data.categoryImages["home-decor"] || "/api/category-image/home-decor",
+            "TABLE TOP": data.categoryImages["table-top"] || "/api/category-image/table-top",
+            "GOD'S SCULPTURE": data.categoryImages["gods-sculpture"] || "/api/category-image/gods-sculpture",
+          };
+          setCategoryImages(mappedImages);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading category images:', error);
+    }
+  };
 
   const loadProducts = async () => {
     try {
@@ -36,12 +63,6 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const categoryImages: Record<string, string> = {
-    "HOME DECOR": "/api/category-image/home-decor",
-    "TABLE TOP": "https://naoazafsrpqglltizasu.supabase.co/storage/v1/object/public/Images/halo%205.jpg",
-    "GOD'S SCULPTURE": "/api/category-image/gods-sculpture",
   };
 
   return (
@@ -62,19 +83,42 @@ export default function ProductsPage() {
               href={c.href}
               className="group glass rounded-lg sm:rounded-xl overflow-hidden hover:shadow-glow transition-shadow"
             >
-              <div className="relative w-full aspect-square bg-white/10 dark:bg-slate-800/50 ring-1 ring-white/10 dark:ring-white/5">
-                <img
-                  src={categoryImages[c.label] ?? `/api/category-image?index=${i}`}
-                  alt={c.label}
-                  className="object-cover w-full h-full"
-                  loading="lazy"
-                  onError={(e) => {
-                    // Fallback if image fails to load (e.g., HEIC not supported)
-                    const target = e.target as HTMLImageElement;
-                    const categoryName = c.label.replace(/'/g, '%27').replace(/ /g, '+');
-                    target.src = `https://via.placeholder.com/800x800/4ade80/ffffff?text=${categoryName}`;
-                  }}
-                />
+              <div className="relative w-full aspect-square bg-white/10 dark:bg-slate-800/50 ring-1 ring-white/10 dark:ring-white/5 overflow-hidden">
+                {categoryImages[c.label] && categoryImages[c.label].startsWith('http') ? (
+                  <img
+                    src={categoryImages[c.label]}
+                    alt={c.label}
+                    className="object-cover w-full h-full"
+                    loading="lazy"
+                    decoding="async"
+                    style={{ 
+                      imageRendering: 'auto',
+                      WebkitImageRendering: 'auto'
+                    }}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      const categoryName = c.label.replace(/'/g, '%27').replace(/ /g, '+');
+                      target.src = `https://via.placeholder.com/800x800/4ade80/ffffff?text=${categoryName}`;
+                    }}
+                  />
+                ) : categoryImages[c.label] ? (
+                  <Image
+                    src={categoryImages[c.label]}
+                    alt={c.label}
+                    fill
+                    className="object-cover"
+                    quality={100}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  />
+                ) : (
+                  <img
+                    src={`/api/category-image?index=${i}`}
+                    alt={c.label}
+                    className="object-cover w-full h-full"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )}
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-200/25 to-emerald-400/20 mix-blend-soft-light group-hover:opacity-90 transition-opacity" />
               </div>
               <div className="p-2 sm:p-4 text-center">

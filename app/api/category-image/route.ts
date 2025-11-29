@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 // Default category images from Supabase Storage
 // This route serves as a fallback when no specific category image is found
@@ -10,6 +11,8 @@ const DEFAULT_CATEGORY_IMAGES = [
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
+    
+    // Fallback: use index parameter or default images
     const indexParam = url.searchParams.get("index") ?? "0";
     let index = Number.parseInt(indexParam, 10);
     if (!Number.isFinite(index) || index < 0) index = 0;

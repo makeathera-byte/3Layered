@@ -77,6 +77,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     { href: "/admin.3layered.06082008/users", label: "Users", icon: "👥" },
     { href: "/admin.3layered.06082008/media", label: "Media", icon: "🖼️" },
     { href: "/admin.3layered.06082008/media/upload", label: "Upload Media", icon: "📤" },
+    { href: "/admin.3layered.06082008/category-images", label: "Category Images", icon: "🖼️" },
     { href: "/admin.3layered.06082008/pages", label: "Pages", icon: "📄" },
     { href: "/admin.3layered.06082008/settings", label: "Settings", icon: "⚙️" },
   ];

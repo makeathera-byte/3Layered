@@ -48,10 +48,18 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/storage/v1/object/public/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'cdn.shopify.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
     // Security: prevent image domain spoofing
     dangerouslyAllowSVG: false,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    // Increase quality for better image rendering
+    formats: ['image/avif', 'image/webp'],
   },
   
   // Security: Disable X-Powered-By header

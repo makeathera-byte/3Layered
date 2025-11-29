@@ -5,7 +5,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 
 export const metadata: Metadata = {
   title: "3Layered - 3D Printing Store",
-  description: "Your trusted 3D printing store offering high-quality prints, custom designs, action figures, sculptures, and more. We print your ideas to life!",
+  description: "Your trusted 3D printing store offering high-quality prints, custom designs, sculptures, and more. We print your ideas to life!",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

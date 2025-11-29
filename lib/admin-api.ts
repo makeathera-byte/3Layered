@@ -378,3 +378,30 @@ export const adminCustomizedOrdersAPI = {
     return response.json();
   },
 };
+
+// Category Images API
+export const adminCategoryImagesAPI = {
+  getAll: async () => {
+    const response = await fetch('/api/admin/category-images', {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch category images');
+    }
+    return response.json();
+  },
+
+  update: async (categoryImages: Record<string, string>) => {
+    const response = await fetch('/api/admin/category-images', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ categoryImages })
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update category images');
+    }
+    return response.json();
+  }
+};
