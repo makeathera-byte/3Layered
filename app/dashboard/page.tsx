@@ -25,6 +25,7 @@ interface Order {
 export default function UserDashboard() {
   const router = useRouter();
   const { user, profile, signOut, loading: authLoading } = useAuth();
+  const [mounted, setMounted] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -33,6 +34,10 @@ export default function UserDashboard() {
     completedOrders: 0,
     totalSpent: 0,
   });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -61,7 +66,7 @@ export default function UserDashboard() {
           o.status === "pending" || o.status === "processing"
         ).length || 0;
         const completedOrders = ordersData.orders?.filter((o: Order) => 
-          o.status === "completed"
+          o.status === "completed" || o.status === "delivered"
         ).length || 0;
         const totalSpent = ordersData.orders?.reduce((sum: number, o: Order) => 
           sum + parseFloat(o.total_amount?.toString() || "0"), 0
@@ -86,7 +91,7 @@ export default function UserDashboard() {
     router.push("/");
   };
 
-  if (authLoading || loading) {
+  if (!mounted || authLoading || loading) {
     return (
       <section className="max-w-6xl mx-auto mt-10 px-4">
         <div className="glass rounded-2xl p-8 text-center">
@@ -260,23 +265,33 @@ export default function UserDashboard() {
                             {order.order_number || `Order #${order.id.slice(0, 8)}`}
                           </span>
                           <span
-                            className={`text-xs px-2 py-1 rounded-full ${
-                              order.status === "completed"
+                            className={`text-xs px-2 py-1 rounded-full font-medium ${
+                              order.status === "completed" || order.status === "delivered"
                                 ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
                                 : order.status === "pending"
                                 ? "bg-orange-100 text-orange-700 border border-orange-200"
+                                : order.status === "processing"
+                                ? "bg-blue-100 text-blue-700 border border-blue-200"
+                                : order.status === "shipped"
+                                ? "bg-indigo-100 text-indigo-700 border border-indigo-200"
+                                : order.status === "cancelled"
+                                ? "bg-red-100 text-red-700 border border-red-200"
                                 : "bg-gray-100 text-gray-700 border border-gray-200"
                             }`}
                           >
-                            {order.status || "pending"}
+                            {order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : "Pending"}
                           </span>
                         </div>
                         <p className="text-sm text-green-900/70">
-                          {new Date(order.created_at).toLocaleDateString("en-US", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })}
+                          {mounted ? (
+                            new Date(order.created_at).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })
+                          ) : (
+                            <span className="text-transparent">Loading...</span>
+                          )}
                         </p>
                         {order.order_items && order.order_items.length > 0 && (
                           <p className="text-xs text-green-900/60 mt-1">

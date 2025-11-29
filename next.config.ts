@@ -17,10 +17,8 @@ const nextConfig: NextConfig = {
             key: 'Strict-Transport-Security',
             value: 'max-age=63072000; includeSubDomains; preload'
           },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY'
-          },
+          // X-Frame-Options removed - using CSP frame-ancestors in middleware for better control
+          // This allows Razorpay payment modal iframe while still protecting other content
           {
             key: 'X-Content-Type-Options',
             value: 'nosniff'

@@ -86,7 +86,7 @@ export function validateOrderData(data: any): ValidationResult {
   }
 
   // Validate payment method
-  if (data.payment_method && !['COD', 'Online', 'UPI', 'Card'].includes(data.payment_method)) {
+  if (data.payment_method && !['COD', 'Online', 'UPI', 'Card', 'razorpay'].includes(data.payment_method)) {
     errors.push('Invalid payment method');
   }
 

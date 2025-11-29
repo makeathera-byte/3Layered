@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { adminOrdersAPI } from "@/lib/admin-api";
+import { formatDateLocale, formatTimeLocale } from "@/lib/dateUtils";
 
 export default function AdminOrders() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function AdminOrders() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("all");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,10 +31,12 @@ export default function AdminOrders() {
     }
   }, [router, mounted]);
 
-  const loadOrders = async () => {
+  const loadOrders = async (forceRefresh = false) => {
     try {
       setLoading(true);
-      const data = await adminOrdersAPI.getAll();
+      // Add cache-busting timestamp to ensure fresh data
+      const cacheBuster = forceRefresh ? `?t=${Date.now()}` : '';
+      const data = await adminOrdersAPI.getAll(cacheBuster);
       setOrders(data.orders || []);
     } catch (error) {
       console.error("Error loading orders:", error);
@@ -45,10 +49,18 @@ export default function AdminOrders() {
     try {
       setUpdatingId(orderId);
       await adminOrdersAPI.updateStatus(orderId, { status: newStatus });
-      await loadOrders();
+      // Update local state immediately for better UX
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId ? { ...order, status: newStatus } : order
+        )
+      );
+      await loadOrders(true); // Force refresh after update
     } catch (error) {
       console.error("Error updating order:", error);
       alert("Failed to update order status");
+      // Reload orders on error to ensure state is correct (force refresh)
+      await loadOrders(true);
     } finally {
       setUpdatingId(null);
     }
@@ -71,21 +83,68 @@ export default function AdminOrders() {
 
     try {
       setDeletingId(orderId);
-      await adminOrdersAPI.delete(orderId);
-      alert(`Order ${orderNumber} deleted successfully`);
-      await loadOrders();
+      console.log('[Delete Order] Attempting to delete order:', { orderId, orderNumber });
+      
+      const result = await adminOrdersAPI.delete(orderId);
+      console.log('[Delete Order] Delete successful:', result);
+      
+      // Show success message
+      alert(`Order ${orderNumber} deleted successfully!`);
+      
+      // Remove the order from the local state immediately for better UX
+      setOrders(prevOrders => prevOrders.filter(order => order.id !== orderId));
+      // Then reload with force refresh to ensure consistency (bypass cache)
+      await loadOrders(true);
     } catch (error: any) {
-      console.error("Error deleting order:", error);
-      alert(`Failed to delete order: ${error.message || 'Unknown error'}`);
+      console.error("[Delete Order] Error deleting order:", error);
+      console.error("[Delete Order] Error details:", {
+        message: error?.message,
+        error: error?.error,
+        details: error?.details,
+        code: error?.code,
+        stack: error?.stack
+      });
+      
+      // Extract detailed error message
+      let errorMessage = 'Unknown error';
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.error) {
+        errorMessage = error.error;
+      } else if (error?.details?.error) {
+        errorMessage = error.details.error;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      // Show detailed error to user
+      alert(`Failed to delete order: ${errorMessage}\n\nOrder Number: ${orderNumber}\n\nIf this persists, please check:\n1. The order is not referenced by other records\n2. You have proper admin permissions\n3. Check the browser console (F12) for more details`);
+      
+      // Reload orders on error to ensure state is correct (force refresh)
+      await loadOrders(true);
     } finally {
       setDeletingId(null);
     }
   };
 
-  // Filter orders based on selected status
-  const filteredOrders = filterStatus === "all" 
-    ? orders 
-    : orders.filter(order => (order.status || "pending") === filterStatus);
+  // Filter orders based on selected status and payment status
+  const filteredOrders = orders.filter(order => {
+    // Filter by order status
+    const statusMatch = filterStatus === "all" 
+      ? true
+      : filterStatus === "delivered"
+      ? (order.status || "pending") === "delivered" || (order.status || "pending") === "completed"
+      : (order.status || "pending") === filterStatus;
+    
+    // Filter by payment status (exclude failed by default unless explicitly requested)
+    const paymentMatch = filterPaymentStatus === "all"
+      ? (order.payment_status || "pending") !== "failed" // Hide failed by default
+      : filterPaymentStatus === "show-failed"
+      ? true // Show all including failed
+      : (order.payment_status || "pending") === filterPaymentStatus;
+    
+    return statusMatch && paymentMatch;
+  });
 
   // Count orders by status
   const orderCounts = {
@@ -93,11 +152,11 @@ export default function AdminOrders() {
     pending: orders.filter(o => (o.status || "pending") === "pending").length,
     processing: orders.filter(o => (o.status || "pending") === "processing").length,
     shipped: orders.filter(o => (o.status || "pending") === "shipped").length,
-    delivered: orders.filter(o => (o.status || "pending") === "delivered").length,
+    delivered: orders.filter(o => (o.status || "pending") === "delivered" || (o.status || "pending") === "completed").length,
     cancelled: orders.filter(o => (o.status || "pending") === "cancelled").length,
   };
 
-  if (!mounted || !isAuthorized) {
+  if (!mounted) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center min-h-[400px]">
@@ -105,6 +164,10 @@ export default function AdminOrders() {
         </div>
       </AdminLayout>
     );
+  }
+
+  if (!isAuthorized) {
+    return null; // Router will handle redirect
   }
 
   return (
@@ -116,7 +179,7 @@ export default function AdminOrders() {
             <p className="text-gray-800 mt-2">Manage customer orders</p>
           </div>
           <button
-            onClick={loadOrders}
+            onClick={() => loadOrders(true)}
             className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
           >
             🔄 Refresh
@@ -124,9 +187,39 @@ export default function AdminOrders() {
         </div>
 
         {/* Filter Categories */}
-        <div className="bg-white rounded-xl p-4 border border-gray-200">
-          <div className="flex flex-wrap gap-2">
-            <button
+        <div className="bg-white rounded-xl p-4 border border-gray-200 space-y-4">
+          {/* Payment Status Filter */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">Payment Status:</label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setFilterPaymentStatus("all")}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  filterPaymentStatus === "all"
+                    ? "bg-emerald-600 text-white shadow-md"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                Hide Failed
+              </button>
+              <button
+                onClick={() => setFilterPaymentStatus("show-failed")}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  filterPaymentStatus === "show-failed"
+                    ? "bg-red-600 text-white shadow-md"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                Show All (Including Failed)
+              </button>
+            </div>
+          </div>
+          
+          {/* Order Status Filter */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">Order Status:</label>
+            <div className="flex flex-wrap gap-2">
+              <button
               onClick={() => setFilterStatus("all")}
               className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
                 filterStatus === "all"
@@ -174,7 +267,7 @@ export default function AdminOrders() {
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
-              ✅ Delivered ({orderCounts.delivered})
+              ✅ Delivered/Completed ({orderCounts.delivered})
             </button>
             <button
               onClick={() => setFilterStatus("cancelled")}
@@ -185,7 +278,8 @@ export default function AdminOrders() {
               }`}
             >
               ❌ Cancelled ({orderCounts.cancelled})
-            </button>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -250,8 +344,13 @@ export default function AdminOrders() {
                         )}
                       </div>
                       <p className="text-gray-700 text-xs mt-1">
-                        {new Date(order.created_at).toLocaleDateString()} at{" "}
-                        {new Date(order.created_at).toLocaleTimeString()}
+                        {mounted ? (
+                          <>
+                            {formatDateLocale(order.created_at)} at {formatTimeLocale(order.created_at)}
+                          </>
+                        ) : (
+                          <span className="text-transparent">Loading...</span>
+                        )}
                       </p>
                     </div>
                     <div className="text-right">
@@ -407,13 +506,14 @@ export default function AdminOrders() {
                           value={order.status || "pending"}
                           onChange={(e) => handleStatusChange(order.id, e.target.value)}
                           disabled={updatingId === order.id}
-                          className="px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-300 text-gray-800 text-sm disabled:opacity-50"
+                          className="px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-300 text-gray-800 text-sm disabled:opacity-50 font-medium"
                         >
-                          <option value="pending">Pending</option>
-                          <option value="processing">Processing</option>
-                          <option value="shipped">Shipped</option>
-                          <option value="delivered">Delivered</option>
-                          <option value="cancelled">Cancelled</option>
+                          <option value="pending">⏳ Pending</option>
+                          <option value="processing">🔄 Processing</option>
+                          <option value="shipped">📦 Shipped</option>
+                          <option value="delivered">✅ Delivered</option>
+                          <option value="completed">✅ Completed</option>
+                          <option value="cancelled">❌ Cancelled</option>
                         </select>
                       </div>
 

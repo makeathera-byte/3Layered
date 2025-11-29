@@ -56,14 +56,14 @@ export default function AboutPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 max-w-6xl mx-auto">
-          {/* Founder - Jay Gehalot */}
+          {/* Founder - Jay Gehlot */}
           <div className="glass rounded-2xl p-6 sm:p-8 hover:shadow-xl transition-all duration-300">
             <div className="flex flex-col items-center text-center">
               {/* Image */}
               <div className="relative w-40 h-40 sm:w-48 sm:h-48 mb-6 rounded-full overflow-hidden ring-4 ring-emerald-500/20 shadow-lg bg-gray-100">
                 <Image
                   src="https://naoazafsrpqglltizasu.supabase.co/storage/v1/object/public/Images/jay%20founder.JPG"
-                  alt="Jay Gehalot - Founder"
+                  alt="Jay Gehlot - Founder"
                   fill
                   className="object-cover"
                   sizes="(max-width: 640px) 160px, 192px"
@@ -75,7 +75,7 @@ export default function AboutPage() {
               {/* Details */}
               <div className="space-y-2 mb-4">
                 <h3 className="text-2xl sm:text-3xl font-bold text-green-900">
-                  Jay Gehalot
+                  Jay Gehlot
                 </h3>
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-emerald-500/20 to-green-500/20 rounded-full border border-emerald-400/40">
                   <svg className="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
@@ -87,7 +87,7 @@ export default function AboutPage() {
               
               {/* Bio */}
               <p className="text-gray-800 leading-relaxed text-sm sm:text-base mb-6">
-                An engineering student with an unwavering passion for 3D printing, Jay founded 3Layered to transform creative ideas into reality. His deep technical knowledge and hands-on experience with additive manufacturing drive the company's commitment to delivering exceptional quality and precision in every print. He personally oversees the technical aspects to ensure each product meets the highest standards.
+                Jay Gehlot is the founder of 3Layered and a 2nd-year college student driven by innovation and creativity. He is building 3Layered as a multi-domain brand focused on modern solutions, design, and growth—balancing entrepreneurship with continuous learning.
               </p>
               
               {/* Contact Buttons */}
@@ -119,7 +119,7 @@ export default function AboutPage() {
             </div>
           </div>
 
-          {/* Co-Founder - Naman Singh Tomar */}
+          {/* CMO - Naman Singh Tomar */}
           <div className="glass rounded-2xl p-6 sm:p-8 hover:shadow-xl transition-all duration-300">
             <div className="flex flex-col items-center text-center">
               {/* Placeholder Avatar */}
@@ -138,7 +138,7 @@ export default function AboutPage() {
                   <svg className="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                   </svg>
-                  <span className="text-sm font-semibold text-emerald-700">Co-Founder</span>
+                  <span className="text-sm font-semibold text-emerald-700">CMO</span>
                 </div>
               </div>
               

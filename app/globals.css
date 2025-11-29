@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  /* Whitish green theme with moss text */
-  --bg: 236 253 245; /* near emerald-50 */
+  /* White background theme with moss text */
+  --bg: 255 255 255; /* pure white */
   --fg: 50 65 40;    /* moss green for text */
 }
 
@@ -14,9 +14,7 @@ html, body, #__next {
 
 body {
   color: rgb(var(--fg));
-  background: radial-gradient(1200px 600px at 0% 0%, rgba(168, 255, 211, 0.24), transparent),
-              radial-gradient(900px 450px at 100% 30%, rgba(16, 185, 129, 0.12), transparent),
-              rgb(var(--bg));
+  background: rgb(var(--bg)); /* Pure white background */
 }
 
 /* Make all text moss green by default */

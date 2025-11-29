@@ -1,0 +1,32 @@
+==========================================
+RAZORPAY ENVIRONMENT VARIABLES SETUP
+==========================================
+
+Add these lines to your .env.local file:
+
+RAZORPAY_KEY_ID=rzp_live_RlUzkarNP6BDhl
+RAZORPAY_KEY_SECRET=5PnSd6Fl40wH0WXz3A23sUBF
+NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_live_RlUzkarNP6BDhl
+
+==========================================
+IMPORTANT NOTES:
+==========================================
+
+1. These are LIVE production keys (not test keys)
+2. RAZORPAY_KEY_ID and NEXT_PUBLIC_RAZORPAY_KEY_ID must be the SAME value
+3. Never commit .env.local to version control
+4. Restart your Next.js server after adding these variables
+5. The server-side uses RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET
+6. The client-side uses NEXT_PUBLIC_RAZORPAY_KEY_ID
+
+==========================================
+VERIFICATION:
+==========================================
+
+After adding these variables, verify:
+1. Server starts without errors
+2. Checkout page loads without Razorpay errors
+3. Payment modal opens when selecting "Online Payment"
+
+==========================================
+

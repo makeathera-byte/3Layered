@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { adminCustomizedOrdersAPI } from "@/lib/admin-api";
+import { formatDateTimeLocale } from "@/lib/dateUtils";
 
 // Contact support number
 const CONTACT_SUPPORT_NUMBER = "+919982781000";
@@ -73,11 +74,18 @@ export default function AdminCustomizedOrders() {
     try {
       setUpdating(true);
       await adminCustomizedOrdersAPI.update(orderId, { status: newStatus });
+      // Update local state immediately
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId ? { ...order, status: newStatus } : order
+        )
+      );
       await loadOrders();
       setEditingOrder(null);
     } catch (error: any) {
       console.error("Error updating order:", error);
       alert(`Failed to update order: ${error.message || "Unknown error"}`);
+      await loadOrders();
     } finally {
       setUpdating(false);
     }
@@ -90,17 +98,30 @@ export default function AdminCustomizedOrders() {
     try {
       setUpdating(true);
       const formData = new FormData(e.currentTarget as HTMLFormElement);
-      await adminCustomizedOrdersAPI.update(editingOrder.id, {
+      const updates = {
         status: formData.get("status") as string,
         quote_amount: formData.get("quote_amount") ? parseFloat(formData.get("quote_amount") as string) : undefined,
         admin_notes: formData.get("admin_notes") as string || undefined,
-      });
+      };
+      await adminCustomizedOrdersAPI.update(editingOrder.id, updates);
+      // Update local state immediately
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === editingOrder.id ? { 
+            ...order, 
+            status: updates.status || order.status,
+            quote_amount: updates.quote_amount !== undefined ? updates.quote_amount : order.quote_amount,
+            admin_notes: updates.admin_notes !== undefined ? (updates.admin_notes || null) : order.admin_notes
+          } : order
+        )
+      );
       await loadOrders();
       setEditingOrder(null);
       setSelectedOrder(null);
     } catch (error: any) {
       console.error("Error updating order:", error);
       alert(`Failed to update order: ${error.message || "Unknown error"}`);
+      await loadOrders();
     } finally {
       setUpdating(false);
     }
@@ -114,11 +135,16 @@ export default function AdminCustomizedOrders() {
     try {
       setDeletingId(orderId);
       await adminCustomizedOrdersAPI.delete(orderId);
+      // Remove the order from the local state immediately for better UX
+      setOrders(prevOrders => prevOrders.filter(order => order.id !== orderId));
+      // Then reload to ensure consistency
       await loadOrders();
       setSelectedOrder(null);
     } catch (error: any) {
       console.error("Error deleting order:", error);
       alert(`Failed to delete order: ${error.message || "Unknown error"}`);
+      // Reload orders on error to ensure state is correct
+      await loadOrders();
     } finally {
       setDeletingId(null);
     }
@@ -140,16 +166,15 @@ export default function AdminCustomizedOrders() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("en-IN", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    if (typeof window === 'undefined') {
+      // Server-side: return safe format
+      const date = new Date(dateString);
+      return date.toISOString().slice(0, 16).replace('T', ' ');
+    }
+    return formatDateTimeLocale(dateString, "en-IN");
   };
 
-  if (!mounted || !isAuthorized) {
+  if (!mounted) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center min-h-screen">
@@ -160,6 +185,10 @@ export default function AdminCustomizedOrders() {
         </div>
       </AdminLayout>
     );
+  }
+
+  if (!isAuthorized) {
+    return null; // Router will handle redirect
   }
 
   return (

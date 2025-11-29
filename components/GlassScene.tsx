@@ -23,18 +23,19 @@ function BasicCube() {
   const mat = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: "#e8f0f5", // Slightly cool white with metallic tint
-        metalness: 0.4, // Metallic finish
-        roughness: 0.05, // Very smooth, almost mirror-like
-        transmission: 0.85, // Glass-like but with metallic properties
-        thickness: 1.2, // Increased thickness for better glass refraction
-        ior: 1.6, // Slightly higher IOR for metallic glass
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.0,
-        reflectivity: 1.0,
-        envMapIntensity: 4.0, // Reduced for performance
-        side: THREE.FrontSide, // Single-sided for better performance
-        // Removed expensive properties: sheen, emissive
+        color: "#ffffff", // Pure white
+        metalness: 1.0, // Maximum metalness for ultra-shiny effect
+        roughness: 0.0, // Perfectly smooth for maximum shininess
+        transmission: 0.0, // No transmission - solid
+        clearcoat: 1.0, // Full clearcoat for maximum shine
+        clearcoatRoughness: 0.0, // Perfectly smooth clearcoat
+        reflectivity: 1.0, // Maximum reflectivity
+        envMapIntensity: 4.5, // Very strong reflection intensity for maximum shininess
+        side: THREE.FrontSide, // Single-sided
+        transparent: false, // Solid
+        opacity: 1.0, // Fully opaque
+        emissive: "#ffffff", // White emissive for brightness
+        emissiveIntensity: 0.15, // Subtle emissive intensity
       }),
     []
   );
@@ -177,9 +178,15 @@ export function GlassScene({ className }: { className?: string }) {
             gl.setClearColor('#000000', 0);
           }}
         >
-          <ambientLight intensity={0.4} />
-          <directionalLight position={[6, 3, 2]} intensity={1.2} color="#ffffff" />
-          <directionalLight position={[-4, 2, -3]} intensity={0.6} color="#b8d4ff" />
+          <ambientLight intensity={0.8} />
+          <directionalLight position={[6, 3, 2]} intensity={2.5} color="#ffffff" />
+          <directionalLight position={[-4, 2, -3]} intensity={1.8} color="#ffffff" />
+          <directionalLight position={[0, 5, -2]} intensity={2.0} color="#ffffff" />
+          <directionalLight position={[3, -2, 4]} intensity={1.5} color="#ffffff" />
+          <pointLight position={[0, 3, 2]} intensity={1.2} color="#ffffff" />
+          <pointLight position={[-3, 1, 3]} intensity={1.0} color="#ffffff" />
+          <pointLight position={[3, 2, -2]} intensity={1.0} color="#ffffff" />
+          <pointLight position={[0, 4, 0]} intensity={0.9} color="#ffffff" />
           {/* Removed point light for better performance */}
           <Suspense fallback={null}>
             <SafeEnvironment />

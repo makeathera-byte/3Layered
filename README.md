@@ -11,7 +11,7 @@ A modern, full-featured e-commerce platform built with Next.js 15, React 19, Typ
 - **Admin Panel**: Complete admin dashboard for managing products, orders, and users
 - **3D Visualization**: Interactive 3D product previews using Three.js
 - **Custom Orders**: Support for customized product orders
-- **Payment Integration**: Multiple payment methods support
+- **Payment Integration**: Razorpay payment gateway with support for UPI, Cards, Net Banking, and Wallets, plus Cash on Delivery (COD)
 - **Responsive Design**: Mobile-optimized with modern UI/UX
 
 ## 🛠️ Tech Stack
@@ -57,6 +57,11 @@ A modern, full-featured e-commerce platform built with Next.js 15, React 19, Typ
    
    # Admin Authentication (generate a strong random string)
    ADMIN_SECRET_KEY=your_secure_admin_secret_key_here
+   
+   # Razorpay Configuration (for online payments)
+   RAZORPAY_KEY_ID=your_razorpay_key_id
+   RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+   NEXT_PUBLIC_RAZORPAY_KEY_ID=your_razorpay_key_id
    
    # Site Configuration (Optional)
    NEXT_PUBLIC_SITE_URL=http://localhost:3000
@@ -113,6 +118,9 @@ A modern, full-featured e-commerce platform built with Next.js 15, React 19, Typ
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key | Yes |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | Yes |
 | `ADMIN_SECRET_KEY` | Secret key for admin authentication | Yes |
+| `RAZORPAY_KEY_ID` | Razorpay API Key ID (from Razorpay Dashboard) | Yes (for payments) |
+| `RAZORPAY_KEY_SECRET` | Razorpay API Key Secret (from Razorpay Dashboard) | Yes (for payments) |
+| `NEXT_PUBLIC_RAZORPAY_KEY_ID` | Razorpay Public Key ID (same as RAZORPAY_KEY_ID) | Yes (for payments) |
 | `NEXT_PUBLIC_SITE_URL` | Your site URL (for production) | Optional |
 
 ## 🗄️ Database Setup

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { adminCustomPrintAPI } from "@/lib/admin-api";
+import { formatDateLocale, formatTimeLocale, formatDateTimeLocale } from "@/lib/dateUtils";
 
 // Contact support number
 const CONTACT_SUPPORT_NUMBER = "+919982781000";
@@ -153,7 +154,7 @@ export default function AdminCustomPrintOrders() {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
 
-  if (!mounted || !isAuthorized) {
+  if (!mounted) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center min-h-[400px]">
@@ -161,6 +162,10 @@ export default function AdminCustomPrintOrders() {
         </div>
       </AdminLayout>
     );
+  }
+
+  if (!isAuthorized) {
+    return null; // Router will handle redirect
   }
 
   return (
@@ -278,7 +283,11 @@ export default function AdminCustomPrintOrders() {
                   <div>
                     <span className="text-sm font-medium text-gray-700">Submitted: </span>
                     <span className="text-sm text-gray-800">
-                      {new Date(order.created_at).toLocaleDateString()} {new Date(order.created_at).toLocaleTimeString()}
+                      {mounted ? (
+                        `${formatDateLocale(order.created_at)} ${formatTimeLocale(order.created_at)}`
+                      ) : (
+                        <span className="text-transparent">Loading...</span>
+                      )}
                     </span>
                   </div>
                 </div>
@@ -402,7 +411,7 @@ export default function AdminCustomPrintOrders() {
                           </a>
                         </p>
                       )}
-                      <p><strong>Submitted:</strong> {new Date(editingOrder.created_at).toLocaleString()}</p>
+                      <p><strong>Submitted:</strong> {mounted ? formatDateTimeLocale(editingOrder.created_at) : 'Loading...'}</p>
                     </div>
                     {editingOrder.file_url && (
                       <div className="mt-3">

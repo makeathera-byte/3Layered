@@ -295,7 +295,13 @@ function OrderConfirmationContent() {
               </div>
               <div>
                 <p className="text-gray-600">Payment Method</p>
-                <p className="text-gray-800 font-semibold">{order.payment_method === 'COD' ? 'Cash on Delivery' : order.payment_method}</p>
+                <p className="text-gray-800 font-semibold">
+                  {order.payment_method === 'COD' 
+                    ? 'Cash on Delivery' 
+                    : order.payment_method === 'razorpay' 
+                    ? 'Online Payment (Razorpay)' 
+                    : order.payment_method || 'Not specified'}
+                </p>
               </div>
               <div>
                 <p className="text-gray-600">Order Status</p>

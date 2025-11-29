@@ -9,6 +9,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Footer from "@/components/Footer";
 import { sanitizeString, sanitizeEmail, sanitizePhone } from "@/lib/security/input-sanitizer";
+import { getRazorpayKeyId } from "@/lib/razorpay/client";
 
 interface ShippingAddress {
   flatNumber: string;
@@ -29,6 +30,7 @@ export default function CheckoutPage() {
   const { cart, getTotalPrice, clearCart, hasCustomizedItems, getCustomizationFee, getOriginalTotalPrice, getTotalSavings } = useCart();
   const { user, loading: authLoading } = useAuth();
   
+  const [mounted, setMounted] = useState(false);
   const [dataLoading, setDataLoading] = useState(true); // Start with true
   const [submitting, setSubmitting] = useState(false);
   
@@ -51,9 +53,18 @@ export default function CheckoutPage() {
   const [orderNotes, setOrderNotes] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("COD");
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+  const [processingPayment, setProcessingPayment] = useState(false);
+
+  // Set mounted state on client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Load user data when auth is ready
   useEffect(() => {
+    if (!mounted) return; // Wait for component to mount
+    
     console.log('[Checkout] useEffect triggered - authLoading:', authLoading, 'user:', user?.id);
     
     // Skip if auth is still loading
@@ -62,22 +73,58 @@ export default function CheckoutPage() {
       return;
     }
     
+    // If no user (guest checkout), immediately set dataLoading to false
+    if (!user) {
+      console.log('[Checkout] No user - guest checkout, setting dataLoading to false');
+      setDataLoading(false);
+      return;
+    }
+    
     console.log('[Checkout] Auth complete, loading user data...');
     
     const loadUserData = async () => {
       try {
-        if (user) {
-          // Immediately set basic info from user object (instant display)
-          console.log('[Checkout] Setting initial user info from auth object');
+        // At this point, user is guaranteed to exist (we return early if no user)
+        // Immediately set basic info from user object (instant display)
+        console.log('[Checkout] Setting initial user info from auth object');
+        setUserInfo({
+          fullName: user.user_metadata?.full_name || "",
+          email: user.email || "",
+          phone: user.user_metadata?.mobile || "",
+        });
+        
+        // Also set address from metadata if available
+        if (user.user_metadata?.address) {
+          const addr = user.user_metadata.address;
+          setShippingAddress({
+            flatNumber: addr.flat_number || "",
+            colony: addr.colony || "",
+            city: addr.city || "",
+            state: addr.state || "",
+            pincode: addr.pincode || "",
+          });
+        }
+        
+        console.log('[Checkout] Fetching user profile for:', user.id);
+        // Then fetch from database for most up-to-date info
+        const { data: profile, error } = await supabase
+          .from('users')
+          .select('full_name, email, mobile, address')
+          .eq('id', user.id)
+          .single();
+        
+        if (!error && profile) {
+          console.log('[Checkout] Profile loaded successfully, updating with database data');
+          // Update with database data (this will overwrite the initial data)
           setUserInfo({
-            fullName: user.user_metadata?.full_name || "",
-            email: user.email || "",
-            phone: user.user_metadata?.mobile || "",
+            fullName: (profile as any)?.full_name || user.user_metadata?.full_name || "",
+            email: (profile as any)?.email || user.email || "",
+            phone: (profile as any)?.mobile || user.user_metadata?.mobile || "",
           });
           
-          // Also set address from metadata if available
-          if (user.user_metadata?.address) {
-            const addr = user.user_metadata.address;
+          // Load address if exists in database
+          if ((profile as any)?.address) {
+            const addr = (profile as any).address;
             setShippingAddress({
               flatNumber: addr.flat_number || "",
               colony: addr.colony || "",
@@ -86,41 +133,9 @@ export default function CheckoutPage() {
               pincode: addr.pincode || "",
             });
           }
-          
-          console.log('[Checkout] Fetching user profile for:', user.id);
-          // Then fetch from database for most up-to-date info
-          const { data: profile, error } = await supabase
-            .from('users')
-            .select('full_name, email, mobile, address')
-            .eq('id', user.id)
-            .single();
-          
-          if (!error && profile) {
-            console.log('[Checkout] Profile loaded successfully, updating with database data');
-            // Update with database data (this will overwrite the initial data)
-            setUserInfo({
-              fullName: (profile as any)?.full_name || user.user_metadata?.full_name || "",
-              email: (profile as any)?.email || user.email || "",
-              phone: (profile as any)?.mobile || user.user_metadata?.mobile || "",
-            });
-            
-            // Load address if exists in database
-            if ((profile as any)?.address) {
-              const addr = (profile as any).address;
-              setShippingAddress({
-                flatNumber: addr.flat_number || "",
-                colony: addr.colony || "",
-                city: addr.city || "",
-                state: addr.state || "",
-                pincode: addr.pincode || "",
-              });
-            }
-          } else {
-            console.log('[Checkout] Profile fetch failed, keeping metadata');
-            // Keep the initial data from metadata (already set above)
-          }
         } else {
-          console.log('[Checkout] No user found');
+          console.log('[Checkout] Profile fetch failed, keeping metadata');
+          // Keep the initial data from metadata (already set above)
         }
       } catch (error) {
         console.error('[Checkout] Error loading user data:', error);
@@ -133,26 +148,73 @@ export default function CheckoutPage() {
           });
         }
       } finally {
-        // Always set dataLoading to false when done
+        // Always set dataLoading to false when done (for both logged in and guest users)
         console.log('[Checkout] Setting dataLoading to false');
         setDataLoading(false);
       }
     };
     
     loadUserData();
-  }, [user?.id, authLoading]); // Depend on user.id and authLoading
+  }, [mounted, user?.id, authLoading]); // Depend on mounted, user.id and authLoading
   
-  // Fallback timeout to prevent infinite loading
+  // Fallback timeout to prevent infinite loading (reduced to 1.5 seconds)
   useEffect(() => {
+    if (!mounted) return;
+    
     const timeout = setTimeout(() => {
       if (dataLoading) {
         console.warn('[Checkout] Loading timeout reached, forcing dataLoading to false');
         setDataLoading(false);
       }
-    }, 5000); // 5 second timeout
+    }, 1500); // 1.5 second timeout
     
     return () => clearTimeout(timeout);
-  }, [dataLoading]);
+  }, [mounted, dataLoading]);
+
+  // Additional safety: Force show page after 2 seconds regardless of loading state
+  useEffect(() => {
+    if (!mounted) return;
+    
+    const safetyTimeout = setTimeout(() => {
+      console.warn('[Checkout] Safety timeout - forcing page to show');
+      setDataLoading(false);
+    }, 2000);
+    
+    return () => clearTimeout(safetyTimeout);
+  }, [mounted]);
+
+  // Auto-refresh if stuck in loading state for too long
+  useEffect(() => {
+    if (!mounted) return;
+    
+    // First, try to force states to false after 3 seconds
+    const forceStateTimeout = setTimeout(() => {
+      if (authLoading || dataLoading) {
+        console.warn('[Checkout] Force clearing loading states after timeout');
+        if (authLoading) {
+          // Auth should have completed by now, force it
+          console.warn('[Checkout] Forcing authLoading to false');
+        }
+        if (dataLoading) {
+          setDataLoading(false);
+        }
+      }
+    }, 3000); // 3 seconds
+    
+    // Then auto-refresh if still stuck after 5 seconds
+    const autoRefreshTimeout = setTimeout(() => {
+      const isLoading = authLoading || dataLoading;
+      if (isLoading) {
+        console.warn('[Checkout] Auto-refreshing page due to stuck loading state');
+        window.location.reload();
+      }
+    }, 5000); // 5 second timeout before auto-refresh
+    
+    return () => {
+      clearTimeout(forceStateTimeout);
+      clearTimeout(autoRefreshTimeout);
+    };
+  }, [mounted, authLoading, dataLoading]);
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -160,6 +222,82 @@ export default function CheckoutPage() {
       router.push("/cart");
     }
   }, [cart, authLoading, dataLoading, router]);
+
+  // Load Razorpay script
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Check if Razorpay is already loaded
+    if ((window as any).Razorpay) {
+      setRazorpayLoaded(true);
+      console.log('[Checkout] Razorpay already loaded');
+      return;
+    }
+
+    // Check if script is already being loaded or exists
+    const existingScript = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+    if (existingScript) {
+      // Script exists, wait for it to load
+      const checkRazorpay = setInterval(() => {
+        if ((window as any).Razorpay) {
+          setRazorpayLoaded(true);
+          console.log('[Checkout] Razorpay script loaded (existing)');
+          clearInterval(checkRazorpay);
+        }
+      }, 100);
+
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        clearInterval(checkRazorpay);
+        if (!(window as any).Razorpay) {
+          console.error('[Checkout] Razorpay script timeout');
+        }
+      }, 10000);
+
+      return () => clearInterval(checkRazorpay);
+    }
+
+    // Create and load script
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.crossOrigin = 'anonymous';
+    
+    script.onload = () => {
+      // Double check Razorpay is available
+      if ((window as any).Razorpay) {
+        setRazorpayLoaded(true);
+        console.log('[Checkout] Razorpay script loaded successfully');
+      } else {
+        console.error('[Checkout] Razorpay script loaded but Razorpay object not found');
+      }
+    };
+    
+    script.onerror = (error) => {
+      console.error('[Checkout] Failed to load Razorpay script', error);
+      console.error('[Checkout] Script URL: https://checkout.razorpay.com/v1/checkout.js');
+      console.error('[Checkout] Please check:');
+      console.error('  1. Internet connection');
+      console.error('  2. Firewall/network restrictions');
+      console.error('  3. Ad blockers (may block payment scripts)');
+    };
+
+    // Add script to document
+    document.body.appendChild(script);
+
+    // Fallback check after 5 seconds
+    const fallbackCheck = setTimeout(() => {
+      if ((window as any).Razorpay && !razorpayLoaded) {
+        setRazorpayLoaded(true);
+        console.log('[Checkout] Razorpay detected via fallback check');
+      }
+    }, 5000);
+
+    return () => {
+      clearTimeout(fallbackCheck);
+      // Don't remove script on unmount as it might be needed by other components
+    };
+  }, [razorpayLoaded]);
 
   const validateForm = (): boolean => {
     const newErrors: {[key: string]: string} = {};
@@ -214,11 +352,257 @@ export default function CheckoutPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Handle Razorpay payment
+  const handleRazorpayPayment = async (orderId: string | null, orderNumber: string | null, totalAmount: number, orderData?: any) => {
+    if (!razorpayLoaded || typeof window === 'undefined' || !(window as any).Razorpay) {
+      alert('Payment gateway is not loaded. Please refresh the page and try again.');
+      return;
+    }
+
+    setProcessingPayment(true);
+
+    try {
+      // Generate a temporary receipt ID for Razorpay (order will be created after payment)
+      const tempReceipt = `temp_${Date.now()}`;
+      
+      // Store order data in a way we can access it later (we'll pass it in verify-payment)
+      // Create Razorpay order (without creating database order yet)
+      const razorpayResponse = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: totalAmount,
+          currency: 'INR',
+          receipt: tempReceipt,
+          notes: {
+            user_email: userInfo.email,
+            user_name: userInfo.fullName,
+            // Note: We'll pass full order_data in verify-payment request
+          },
+        }),
+      });
+
+      const razorpayData = await razorpayResponse.json();
+
+      if (!razorpayResponse.ok || !razorpayData.order) {
+        throw new Error(razorpayData.error || 'Failed to initialize payment');
+      }
+
+      // Get Razorpay key ID (public key)
+      const razorpayKeyId = getRazorpayKeyId();
+
+      // Initialize Razorpay checkout
+      const options = {
+        key: razorpayKeyId,
+        amount: razorpayData.order.amount,
+        currency: razorpayData.order.currency,
+        name: '3Layered',
+        description: `Order Payment`,
+        order_id: razorpayData.order.id,
+        handler: async function (response: any) {
+          try {
+            // Verify payment and create order (order is created only after successful payment)
+            // Pass order_data to create the order after payment verification
+            const verifyResponse = await fetch('/api/razorpay/verify-payment', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                order_data: orderData, // Send order data to create order after payment verification
+              }),
+            });
+
+            const verifyData = await verifyResponse.json();
+
+            if (!verifyResponse.ok) {
+              // Extract detailed error message
+              const errorMessage = verifyData.error || verifyData.message || 'Payment verification failed';
+              const errorDetails = verifyData.details ? `\nDetails: ${JSON.stringify(verifyData.details)}` : '';
+              const errorCode = verifyData.code ? `\nCode: ${verifyData.code}` : '';
+              
+              console.error('[Checkout] Payment verification failed:', {
+                status: verifyResponse.status,
+                error: errorMessage,
+                details: verifyData.details,
+                code: verifyData.code,
+                fullResponse: verifyData
+              });
+              
+              throw new Error(`${errorMessage}${errorDetails}${errorCode}`);
+            }
+            
+            if (!verifyData.verified) {
+              throw new Error(verifyData.error || 'Payment verification failed - signature invalid');
+            }
+
+            // Payment successful and order created
+            console.log('[Checkout] Payment verified and order created successfully', verifyData);
+
+            // Clear cart
+            clearCart();
+
+            // Store order number in sessionStorage
+            if (typeof window !== 'undefined' && verifyData.order_number) {
+              sessionStorage.setItem('lastOrderNumber', verifyData.order_number);
+              sessionStorage.setItem('orderPlaced', 'true');
+            }
+
+            // Redirect to confirmation page
+            const confirmationUrl = `/order-confirmation?order=${encodeURIComponent(verifyData.order_number || '')}`;
+            window.location.href = confirmationUrl;
+
+          } catch (error: any) {
+            console.error('[Checkout] Payment verification error:', error);
+            
+            // No order was created, so no need to update payment status
+            // Just show error to user
+            alert(`Payment verification failed: ${error.message || 'Unknown error'}\n\nNo order was created. Please try again.`);
+            setProcessingPayment(false);
+          }
+        },
+        prefill: {
+          name: userInfo.fullName,
+          email: userInfo.email,
+          contact: userInfo.phone.replace(/\D/g, '').slice(-10), // Last 10 digits
+        },
+        theme: {
+          color: '#10b981', // Emerald color matching the site theme
+        },
+        modal: {
+          ondismiss: function() {
+            setProcessingPayment(false);
+            console.log('[Checkout] Payment modal closed by user');
+            // Don't show alert for modal dismissal - user may retry
+          },
+        },
+        // Add retry configuration
+        retry: {
+          enabled: true,
+          max_count: 3,
+        },
+      };
+
+      const razorpay = new (window as any).Razorpay(options);
+      
+      // Add comprehensive error handlers
+      razorpay.on('payment.failed', async function (response: any) {
+        console.error('[Checkout] Razorpay payment failed:', response);
+        console.error('[Checkout] Payment failure details:', {
+          response: JSON.stringify(response, null, 2),
+          error: response?.error,
+          errorCode: response?.error?.code,
+          errorDescription: response?.error?.description,
+          errorSource: response?.error?.source,
+          errorStep: response?.error?.step,
+          errorReason: response?.error?.reason,
+          metadata: response?.metadata
+        });
+        
+        // No order was created, so no need to update payment status
+        // Payment failed before order creation
+        
+        // Extract error message
+        let errorMessage = 'Payment failed';
+        if (response?.error?.description) {
+          errorMessage = response.error.description;
+        } else if (response?.error?.reason) {
+          errorMessage = `Payment failed: ${response.error.reason}`;
+        } else if (response?.error?.code) {
+          errorMessage = `Payment failed (Error Code: ${response.error.code})`;
+        } else if (Object.keys(response || {}).length === 0) {
+          errorMessage = 'Payment was cancelled or failed. Please try again.';
+        } else {
+          errorMessage = 'Payment failed. Please check your payment details and try again.';
+        }
+        
+        alert(errorMessage);
+        setProcessingPayment(false);
+      });
+
+      // Handle payment cancellation
+      razorpay.on('payment.cancelled', function (response: any) {
+        console.log('[Checkout] Payment cancelled by user:', response);
+        setProcessingPayment(false);
+        // Don't show alert for user cancellation
+      });
+
+      // Handle other errors
+      razorpay.on('error', function (error: any) {
+        console.error('[Checkout] Razorpay error:', error);
+        console.error('[Checkout] Error details:', {
+          error: JSON.stringify(error, null, 2),
+          message: error?.message,
+          code: error?.code,
+          description: error?.description
+        });
+        
+        let errorMessage = 'An error occurred during payment';
+        if (error?.description) {
+          errorMessage = error.description;
+        } else if (error?.message) {
+          errorMessage = error.message;
+        }
+        
+        alert(errorMessage);
+        setProcessingPayment(false);
+      });
+
+      // Open Razorpay modal
+      try {
+        razorpay.open();
+        console.log('[Checkout] Razorpay modal opened');
+      } catch (openError: any) {
+        console.error('[Checkout] Failed to open Razorpay modal:', openError);
+        // Check if it's a CSP/blocking error
+        if (openError.message && openError.message.includes('blocked')) {
+          alert('Payment modal is blocked. Please check browser console for details and ensure ad blockers are disabled.');
+        } else {
+          alert(`Failed to open payment modal: ${openError.message || 'Unknown error'}`);
+        }
+        setProcessingPayment(false);
+      }
+
+    } catch (error: any) {
+      console.error('[Checkout] Razorpay payment error:', error);
+      console.error('[Checkout] Error details:', {
+        message: error.message,
+        stack: error.stack,
+        razorpayLoaded,
+        razorpayAvailable: typeof window !== 'undefined' && !!(window as any).Razorpay
+      });
+      
+      // More specific error messages
+      let errorMessage = 'Payment initialization failed';
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (!razorpayLoaded) {
+        errorMessage = 'Payment gateway not loaded. Please refresh the page.';
+      } else if (typeof window === 'undefined' || !(window as any).Razorpay) {
+        errorMessage = 'Razorpay is not available. Please check your browser console.';
+      }
+      
+      alert(`${errorMessage}\n\nPlease check browser console (F12) for more details.`);
+      setProcessingPayment(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) {
       alert("Please fill in all required fields correctly");
+      return;
+    }
+
+    // For online payment, check if Razorpay is loaded
+    if (paymentMethod === "Online" && !razorpayLoaded) {
+      alert("Payment gateway is loading. Please wait a moment and try again.");
       return;
     }
     
@@ -265,12 +649,22 @@ export default function CheckoutPage() {
         customization_fee: customizationFee,
         cod_fee: codFee,
         total_amount: totalAmount,
-        payment_method: paymentMethod,
+        payment_method: paymentMethod === "Online" ? "razorpay" : paymentMethod,
         payment_status: paymentMethod === "COD" ? "pending" : "pending",
         order_notes: orderNotes || null,
       };
       
-      // Create order via API
+      // For online payment, DON'T create order yet - create it only after payment verification
+      if (paymentMethod === "Online") {
+        setSubmitting(false); // Reset submitting state as we're moving to payment
+        // Store order data temporarily for use after payment verification
+        const tempOrderData = orderData;
+        // Initiate Razorpay payment without creating order first
+        await handleRazorpayPayment(null, null, totalAmount, tempOrderData);
+        return; // Don't proceed with COD flow
+      }
+      
+      // For COD, create order immediately
       const response = await fetch('/api/orders/create', {
         method: 'POST',
         headers: {
@@ -300,7 +694,7 @@ export default function CheckoutPage() {
         order_number: result.order_number
       });
       
-      // Show success alert
+      // For COD, show success alert
       alert(`✅ Order Placed Successfully!\n\nOrder Number: ${result.order_number}\n\nYou will be redirected to the confirmation page...`);
       
       // Clear cart
@@ -330,8 +724,9 @@ export default function CheckoutPage() {
     }
   };
 
-  // Show loading state while auth or data is loading
-  const isLoading = authLoading || dataLoading;
+  // Show loading state only if not mounted or if auth/data is still loading
+  // For guest users, only wait for auth to complete, not data loading
+  const isLoading = !mounted || authLoading || (dataLoading && user);
   
   if (isLoading) {
     return (
@@ -344,8 +739,17 @@ export default function CheckoutPage() {
           <span className="text-lg text-green-900">Loading checkout...</span>
         </div>
         <p className="text-sm text-gray-600">
-          {authLoading ? 'Verifying authentication...' : 'Loading your information...'}
+          {!mounted ? 'Initializing...' : authLoading ? 'Verifying authentication...' : 'Loading your information...'}
         </p>
+        <p className="text-xs text-gray-500 mt-2">
+          If this takes too long, the page will automatically refresh...
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+        >
+          🔄 Refresh Now
+        </button>
       </div>
     );
   }
@@ -509,7 +913,7 @@ export default function CheckoutPage() {
               <div className="glass rounded-xl p-6">
                 <h2 className="text-xl font-bold text-green-900 mb-4">Payment Method</h2>
                 <div className="space-y-3">
-                  <label className="flex items-center p-4 border-2 border-emerald-500 bg-emerald-50 rounded-lg cursor-pointer">
+                  <label className="flex items-center p-4 border-2 border-emerald-500 bg-emerald-50 rounded-lg cursor-pointer hover:bg-emerald-100 transition-colors">
                     <input
                       type="radio"
                       name="payment"
@@ -520,21 +924,34 @@ export default function CheckoutPage() {
                     />
                     <div className="ml-3">
                       <p className="font-semibold text-green-900">Cash on Delivery</p>
-                      <p className="text-sm text-gray-700">Pay when you receive your order</p>
+                      <p className="text-sm text-gray-700">Pay when you receive your order (₹25 COD charges apply)</p>
                     </div>
                   </label>
                   
-                  <label className="flex items-center p-4 border-2 border-gray-300 rounded-lg cursor-not-allowed opacity-50">
+                  <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                    paymentMethod === "Online" 
+                      ? "border-emerald-500 bg-emerald-50" 
+                      : "border-gray-300 hover:border-emerald-300"
+                  } ${!razorpayLoaded ? "opacity-50 cursor-not-allowed" : ""}`}>
                     <input
                       type="radio"
                       name="payment"
                       value="Online"
-                      disabled
-                      className="w-5 h-5"
+                      checked={paymentMethod === "Online"}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      disabled={!razorpayLoaded}
+                      className="w-5 h-5 text-emerald-600"
                     />
                     <div className="ml-3">
-                      <p className="font-semibold text-gray-700">Online Payment</p>
-                      <p className="text-sm text-gray-600">Coming soon</p>
+                      <p className="font-semibold text-green-900">Online Payment (Razorpay)</p>
+                      <p className="text-sm text-gray-700">
+                        {razorpayLoaded 
+                          ? "Pay securely with UPI, Cards, Net Banking, or Wallets" 
+                          : "Loading payment gateway..."}
+                      </p>
+                      {!razorpayLoaded && (
+                        <p className="text-xs text-amber-600 mt-1">Please wait for payment gateway to load</p>
+                      )}
                     </div>
                   </label>
                 </div>
@@ -676,19 +1093,21 @@ export default function CheckoutPage() {
                 {/* Place Order Button */}
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || processingPayment || (paymentMethod === "Online" && !razorpayLoaded)}
                   className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-4 rounded-lg transition-all shadow-lg hover:shadow-xl disabled:cursor-not-allowed mt-6"
                 >
-                  {submitting ? (
+                  {submitting || processingPayment ? (
                     <span className="flex items-center justify-center gap-2">
                       <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Processing...
+                      {processingPayment ? "Opening Payment Gateway..." : "Processing..."}
                     </span>
                   ) : (
-                    `Place Order - ₹${Math.round(total).toLocaleString()}`
+                    paymentMethod === "Online" 
+                      ? `Pay Online - ₹${Math.round(total).toLocaleString()}`
+                      : `Place Order - ₹${Math.round(total).toLocaleString()}`
                   )}
                 </button>
 

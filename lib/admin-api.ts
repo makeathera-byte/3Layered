@@ -63,9 +63,11 @@ export const adminProductsAPI = {
 
 // Orders API
 export const adminOrdersAPI = {
-  getAll: async () => {
-    const response = await fetch('/api/admin/orders', {
-      headers: getAuthHeaders()
+  getAll: async (cacheBuster = '') => {
+    const url = `/api/admin/orders${cacheBuster}`;
+    const response = await fetch(url, {
+      headers: getAuthHeaders(),
+      cache: 'no-store' // Prevent browser caching
     });
     if (!response.ok) throw new Error('Failed to fetch orders');
     return response.json();
@@ -82,15 +84,45 @@ export const adminOrdersAPI = {
   },
 
   delete: async (id: string) => {
-    const response = await fetch(`/api/admin/orders?id=${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to delete order');
+    try {
+      const url = `/api/admin/orders?id=${id}`;
+      console.log('[Admin API] Deleting order:', { id, url });
+      
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      
+      console.log('[Admin API] Delete response status:', response.status);
+      
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          console.error('[Admin API] Failed to parse error response:', parseError);
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+        }
+        
+        console.error('[Admin API] Delete error response:', errorData);
+        
+        // Include details if available
+        const errorMessage = errorData.error || errorData.message || `Failed to delete order (HTTP ${response.status})`;
+        const error = new Error(errorMessage);
+        // Attach additional error info
+        (error as any).details = errorData.details || errorData;
+        (error as any).code = errorData.code;
+        (error as any).status = response.status;
+        throw error;
+      }
+      
+      const result = await response.json();
+      console.log('[Admin API] Delete successful:', result);
+      return result;
+    } catch (error: any) {
+      console.error('[Admin API] Delete request failed:', error);
+      throw error;
     }
-    return response.json();
   }
 };
 

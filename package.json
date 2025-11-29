@@ -2,9 +2,9 @@
   "name": "3-layered",
   "version": "0.1.0",
   "private": true,
-  "description": "Modern e-commerce platform with 3D product visualization",
+  "description": "",
   "author": "",
-  "license": "UNLICENSED",
+  "license": "ISC",
   "repository": {
     "type": "git",
     "url": "https://github.com/yourusername/3-layered.git"
@@ -24,6 +24,7 @@
     "firebase": "^12.5.0",
     "firebase-admin": "^13.6.0",
     "next": "15.1.2",
+    "razorpay": "^2.9.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.171.0",
@@ -42,12 +43,9 @@
     "tailwindcss": "^3.4.0",
     "typescript": "^5.7.2"
   },
-  "description": "",
   "main": "next.config.ts",
   "directories": {
     "lib": "lib"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "keywords": []
 }

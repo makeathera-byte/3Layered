@@ -64,7 +64,7 @@ export default function AdminDashboard() {
     checkAuthAndLoad();
   }, [router]);
 
-  if (!mounted || !isAuthorized) {
+  if (!mounted) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center min-h-[400px]">
@@ -72,6 +72,10 @@ export default function AdminDashboard() {
         </div>
       </AdminLayout>
     );
+  }
+
+  if (!isAuthorized) {
+    return null; // Router will handle redirect
   }
 
   const statCards = [
@@ -262,15 +266,21 @@ export default function AdminDashboard() {
                         ₹{parseFloat(order.total_amount || 0).toLocaleString()}
                       </p>
                       <span
-                        className={`text-xs px-2 py-1 rounded-full ${
+                        className={`text-xs px-2 py-1 rounded-full font-medium ${
                           order.status === "pending"
                             ? "bg-orange-100 text-orange-700 border border-orange-200"
-                            : order.status === "completed"
+                            : order.status === "processing"
+                            ? "bg-blue-100 text-blue-700 border border-blue-200"
+                            : order.status === "shipped"
+                            ? "bg-indigo-100 text-indigo-700 border border-indigo-200"
+                            : order.status === "delivered" || order.status === "completed"
                             ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                            : order.status === "cancelled"
+                            ? "bg-red-100 text-red-700 border border-red-200"
                             : "bg-gray-100 text-gray-700 border border-gray-200"
                         }`}
                       >
-                        {order.status || "pending"}
+                        {order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : "Pending"}
                       </span>
                     </div>
                   </div>

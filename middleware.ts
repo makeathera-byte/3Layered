@@ -12,27 +12,50 @@ export function middleware(request: NextRequest) {
   // Security Headers
   response.headers.set('X-DNS-Prefetch-Control', 'on');
   response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
-  response.headers.set('X-Frame-Options', 'DENY');
+  // Note: X-Frame-Options removed - using CSP frame-ancestors instead for better control
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   
   // Content Security Policy
-  const csp = [
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com data:",
-    "img-src 'self' data: https: blob:",
-    "connect-src 'self' https://*.supabase.co https://*.supabase.in",
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "upgrade-insecure-requests",
-  ].join('; ');
+  // More permissive CSP for Razorpay integration
+  // Using wildcards for Razorpay to allow all subdomains and resources
+  const isCheckoutPage = pathname.startsWith('/checkout') || pathname.startsWith('/order-confirmation');
   
-  response.headers.set('Content-Security-Policy', csp);
+  // More permissive CSP for checkout and order confirmation pages to allow Razorpay
+  if (isCheckoutPage) {
+    const csp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://*.razorpay.com https://razorpay.com https://checkout.razorpay.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.razorpay.com https://razorpay.com https://checkout.razorpay.com",
+      "font-src 'self' https://fonts.gstatic.com data: https://*.razorpay.com https://razorpay.com",
+      "img-src 'self' data: https: blob: https://*.razorpay.com https://razorpay.com",
+      "connect-src 'self' https://*.supabase.co https://*.supabase.in https://*.razorpay.com https://razorpay.com https://api.razorpay.com https://checkout.razorpay.com",
+      "frame-src 'self' https://*.razorpay.com https://razorpay.com https://checkout.razorpay.com data: blob:",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self' https://*.razorpay.com https://razorpay.com https://checkout.razorpay.com",
+      "upgrade-insecure-requests",
+    ].join('; ');
+    response.headers.set('Content-Security-Policy', csp);
+  } else {
+    // Standard CSP for other pages
+    const csp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://*.razorpay.com https://razorpay.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.razorpay.com https://razorpay.com",
+      "font-src 'self' https://fonts.gstatic.com data: https://*.razorpay.com https://razorpay.com",
+      "img-src 'self' data: https: blob: https://*.razorpay.com https://razorpay.com",
+      "connect-src 'self' https://*.supabase.co https://*.supabase.in https://*.razorpay.com https://razorpay.com",
+      "frame-src 'self' https://*.razorpay.com https://razorpay.com",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self' https://*.razorpay.com https://razorpay.com",
+      "upgrade-insecure-requests",
+    ].join('; ');
+    response.headers.set('Content-Security-Policy', csp);
+  }
 
   // Protect admin routes
   if (pathname.startsWith('/admin.3layered.06082008')) {

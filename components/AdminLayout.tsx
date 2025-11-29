@@ -13,11 +13,18 @@ interface AdminLayoutProps {
 export function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return; // Wait for client-side mount
+    
     // Verify authentication on mount and periodically
     const checkAuth = () => {
       if (!isAdminAuthenticated()) {
@@ -42,17 +49,20 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       clearInterval(authInterval);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [router]);
+  }, [router, mounted]);
 
   const handleLogout = () => {
     clearAdminSession();
     router.push("/admin.3layered.06082008/login");
   };
 
-  if (checkingAuth || !isAuthenticated) {
+  // Show loading state during SSR or while checking auth
+  if (!mounted || checkingAuth || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-800">Verifying authentication...</div>
+        <div className="text-gray-800">
+          {!mounted ? 'Loading...' : 'Verifying authentication...'}
+        </div>
       </div>
     );
   }

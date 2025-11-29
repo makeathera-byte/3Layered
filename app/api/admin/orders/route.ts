@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { handleApiError, AuthenticationError, ValidationError, NotFoundError } from '@/lib/backend/errors';
+import { handleApiError, AuthenticationError, ValidationError, NotFoundError, DatabaseError, AuthorizationError } from '@/lib/backend/errors';
 import { logger } from '@/lib/backend/logger';
 import { rateLimit, getClientIP } from '@/lib/backend/security';
 import { dbOperation, verifyTableStructure } from '@/lib/backend/database';
@@ -73,7 +73,11 @@ export async function GET(request: NextRequest) {
       throw new Error('Orders table structure issue');
     }
 
-    // Use cached customized order IDs (refresh every 30 seconds)
+    // Check for cache-busting parameter
+    const { searchParams } = new URL(request.url);
+    const forceRefresh = searchParams.has('t'); // If timestamp parameter exists, force refresh
+    
+    // Use cached customized order IDs (refresh every 30 seconds, or immediately if force refresh)
     const customizedOrderIdSet = await cache.getOrSet(
       'customized_order_ids',
       async () => {
@@ -93,7 +97,7 @@ export async function GET(request: NextRequest) {
             .filter(Boolean)
         );
       },
-      30 * 1000 // 30 seconds cache
+      forceRefresh ? 0 : 30 * 1000 // 0 cache if force refresh, otherwise 30 seconds
     );
 
     // Fetch all orders with optimized query and performance monitoring
@@ -115,7 +119,11 @@ export async function GET(request: NextRequest) {
     );
 
     // Filter out orders that have customized items
-    const data = allOrders.filter((order: any) => !customizedOrderIdSet.has(order.id));
+    // Also filter out orders with failed payment status (unsuccessful payments)
+    const data = allOrders.filter((order: any) => 
+      !customizedOrderIdSet.has(order.id) && 
+      order.payment_status !== 'failed'
+    );
 
     logger.info('Orders fetched successfully', { 
       total: allOrders.length,
@@ -124,8 +132,15 @@ export async function GET(request: NextRequest) {
 
     const response = NextResponse.json({ orders: data });
     
-    // Add cache headers for admin endpoints (short cache)
-    response.headers.set('Cache-Control', 'private, max-age=30');
+    // Add cache headers for admin endpoints (no cache to ensure fresh data)
+    // If force refresh is requested, ensure no caching
+    if (forceRefresh) {
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      response.headers.set('Pragma', 'no-cache');
+      response.headers.set('Expires', '0');
+    } else {
+      response.headers.set('Cache-Control', 'private, max-age=0, must-revalidate');
+    }
     
     return response;
   } catch (error) {
@@ -240,6 +255,72 @@ export async function DELETE(request: NextRequest) {
       orderNumber: existingOrder.order_number 
     });
 
+    // Check for related records that might prevent deletion
+    // Note: order_items should cascade delete, but let's check for other references
+    
+    // Check and update customized orders
+    try {
+      const { data: customizedOrders, error: customError } = await supabaseAdmin
+        .from('customized_orders')
+        .select('id')
+        .eq('order_id', id)
+        .is('deleted_at', null);
+      
+      if (customError) {
+        logger.warn('Error checking customized orders', { error: customError, orderId: id });
+      } else if (customizedOrders && customizedOrders.length > 0) {
+        // Update customized orders to remove order_id reference first
+        const { error: updateError } = await supabaseAdmin
+          .from('customized_orders')
+          .update({ order_id: null })
+          .eq('order_id', id);
+        
+        if (updateError) {
+          logger.warn('Error updating customized orders', { error: updateError, orderId: id });
+          // Continue anyway - might not be critical
+        } else {
+          logger.info('Updated customized orders to remove order reference', { 
+            orderId: id, 
+            count: customizedOrders.length 
+          });
+        }
+      }
+    } catch (error) {
+      logger.warn('Error processing customized orders before deletion', { error, orderId: id });
+      // Continue with deletion anyway
+    }
+
+    // Check for reviews that reference this order (they should have ON DELETE SET NULL)
+    try {
+      const { data: reviews, error: reviewsError } = await supabaseAdmin
+        .from('reviews')
+        .select('id')
+        .eq('order_id', id);
+      
+      if (reviewsError) {
+        logger.warn('Error checking reviews', { error: reviewsError, orderId: id });
+      } else if (reviews && reviews.length > 0) {
+        // Update reviews to remove order_id reference (should be SET NULL but let's be safe)
+        const { error: updateError } = await supabaseAdmin
+          .from('reviews')
+          .update({ order_id: null })
+          .eq('order_id', id);
+        
+        if (updateError) {
+          logger.warn('Error updating reviews', { error: updateError, orderId: id });
+          // Continue anyway
+        } else {
+          logger.info('Updated reviews to remove order reference', { 
+            orderId: id, 
+            count: reviews.length 
+          });
+        }
+      }
+    } catch (error) {
+      logger.warn('Error processing reviews before deletion', { error, orderId: id });
+      // Continue with deletion anyway
+    }
+
     // Delete the order
     await dbOperation(
       async () => {
@@ -249,13 +330,46 @@ export async function DELETE(request: NextRequest) {
           .eq('id', id)
           .select()
           .single();
-        if (error) throw error;
+        
+        if (error) {
+          logger.error('Database delete error', error, { orderId: id });
+          // Provide more detailed error message
+          const errorMessage = (error as any)?.message || 'Unknown database error';
+          const errorCode = (error as any)?.code || 'UNKNOWN';
+          const errorDetails = (error as any)?.details || '';
+          
+          // Check for foreign key constraint violations
+          if (errorMessage.includes('foreign key') || errorCode === '23503' || errorDetails.includes('foreign key')) {
+            throw new DatabaseError(
+              'Cannot delete order: It is referenced by other records. The system will attempt to clean up related records.',
+              { originalError: errorMessage, code: errorCode, details: errorDetails }
+            );
+          }
+          
+          // Check for RLS policy violations
+          if (errorMessage.includes('policy') || errorCode === '42501' || errorMessage.includes('permission denied')) {
+            throw new AuthorizationError(
+              'Cannot delete order: Insufficient permissions. Please check Row Level Security policies or ensure you are using the admin client.'
+            );
+          }
+          
+          // Check for not found errors
+          if (errorCode === 'PGRST116' || errorMessage.includes('No rows')) {
+            throw new NotFoundError('Order');
+          }
+          
+          throw new DatabaseError(`Failed to delete order: ${errorMessage}`, { code: errorCode, details: errorDetails });
+        }
+        
         return { data, error: null };
       },
       'Failed to delete order'
     );
 
     logger.info('Order deleted successfully', { orderId: id });
+
+    // Invalidate the customized order IDs cache since we may have updated them
+    await cache.delete('customized_order_ids');
 
     return NextResponse.json({ 
       success: true,
